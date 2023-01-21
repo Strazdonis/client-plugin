@@ -1,9 +1,36 @@
-let cheetosAdded = false;
+/**
+ * legacy
+ */
+// let cheetosAdded = false;
+// let autoAcceptObserver;
 
-let autoAcceptObserver;
+/**
+ * used to store the interval for auto accept, so we can close it in case user disables setting
+ */
 let acceptInterval;
 
+/**
+ * used to store the injected css elements, so we can remove them in case user disables setting
+ * structure: { key: cssElement }
+ */
+const INJECTED_CSS = {};
 
+/**
+ * used to store the interval for each observers, so we can close them in case user disables setting
+ * structure: { key: interval }
+ */
+const OBSERVER_INTERVALS = {};
+
+/**
+ * runeSelectorObserver, used to store the observer for rune page, so we can remove it in case user disables setting
+ */
+let runeSelectorObserver = null;
+
+/**
+ * generates description (<label> element) for setting
+ * @param {string} text 
+ * @returns {LabelElement} <label> element
+ */
 const generateDescription = (text) => {
    const label = document.createElement('label');
    label.classList.add('lol-settings-ingame-sound-description-text');
@@ -12,11 +39,19 @@ const generateDescription = (text) => {
    return label;
 }
 
-const generateCheckbox = (key, cheat) => {
+
+/**
+ * 
+ * @param {keyof CHEATS} key a key used to set input name and id, usually keyof CHEATS
+ * @param {CHEATS[keyof CHEATS]} cheat object with cheat function, usually an entry in CHEATS
+ * @returns {CheckboxElement} <lol-uikit-flat-checkbox> element
+ */
+const generateCheckbox = (key, cheat, checked) => {
    const lol_uikit_flat_checkbox = document.createElement('lol-uikit-flat-checkbox');
    lol_uikit_flat_checkbox.setAttribute('for', key);
    const input2 = document.createElement('input');
    input2.slot = 'input';
+   input2.checked = checked;
    input2.name = key;
    input2.type = 'checkbox';
    input2.id = key;
@@ -33,6 +68,14 @@ const generateCheckbox = (key, cheat) => {
    return lol_uikit_flat_checkbox;
 }
 
+/**
+ * 
+ * @param {string} name name of input 
+ * @param {string} type input type (text | number , etc) 
+ * @param {string} value input value
+ * @param {string} placeholder placeholder text
+ * @returns {InputElement} <lol-uikit-flat-input> element
+ */
 const generateInputHTML = (name, type, value, placeholder) => {
    const input = document.createElement('lol-uikit-flat-input');
    input.style.marginBottom = '12px';
@@ -225,18 +268,28 @@ const generateHTML = async (key, cheat) => {
 //    }
 // }, 1000)
 
+/**
+ * accepts the match found popup
+ */
 function acceptMatchFound() {
    fetch('/lol-matchmaking/v1/ready-check/accept', {
       method: 'POST'
    })
 }
 
+/**
+ * dodges the match, you still lose LP
+ */
 function dodgeMatch() {
    fetch('/lol-login/v1/session/invoke?destination=lcdsServiceProxy&method=call&args=["","teambuilder-draft","quitV2",""]', {
       method: 'POST'
    });
 }
 
+/**
+ * gets summoner data of the player
+ * @param {Object} player player object, uses summonerId and nameVisibilityType
+ */
 async function getPlayer(player) {
    if (player.nameVisibilityType === 'Hidden') {
       const response = await fetch('/chat/v5/participants/champ-select');
@@ -248,12 +301,20 @@ async function getPlayer(player) {
    }
 }
 
+/**
+ * gets friend list
+ * @returns {Object[]} array of friends' summoner data
+ */
 async function getFriends() {
    const data = await fetch("/lol-chat/v1/friends");
    const friends = await data.json();
    return friends;
 }
 
+/**
+ * gets request headers from a fetch request
+ * @returns {Object} port and idToken
+ */
 async function getHeaders() {
    const response = await fetch('/lol-login/v1/session');
    const session = await response.json();
@@ -265,17 +326,100 @@ async function getHeaders() {
    return { port, idToken };
 }
 
+/**
+ * gets access token, riot started using this instead of idToken
+ * @returns {Object} object with access token
+ */
 async function getToken() {
    const response = await fetch("/lol-rso-auth/v1/authorization/access-token");
    const data = await response.json();
    return data;
 }
 
+/**
+ * clicks the 'edit runes' button in rune selector modal
+ */
+async function clickManualRunes() {
+   document.querySelector(".runes-recommender-header > div:nth-child(2) > div").click();
+}
+
+/**
+ * adds mutation observer to the target element. if the target element is not found, it will try again every 500ms
+ * observer intervals added to OBSERVER_INTERVALS object, so they can be cleared later
+ * @param {MutationObserver} observer observer to add
+ * @param {string} targetSelector selector of the target element
+ * @param {Object} config config object for the observer
+ * @param {string} key key to add the interval to OBSERVER_INTERVALS object
+ * @returns {Promise} promise that resolves when the observer is added
+ */
+function addObserver(observer, targetSelector, config, key) {
+   console.log('adding observer', targetSelector, key)
+   // const interval = setInterval(() => {
+   //    const target = document.querySelector(targetSelector);
+   //    console.log(`[${key}] target:`, target, `selector: ${targetSelector}`)
+   //    if (target) {
+   //       console.log(`[${key}] FOUND!`, target)
+   //       clearInterval(interval);
+   //       observer.observe(target, config);
+   //    }
+   // }, 500);
+   const interval = setInterval(() => {
+      const target = document.querySelector(
+         targetSelector
+      );
+      if (target) {
+         console.log("FOUND!!");
+         clearInterval(interval);
+         observer.observe(target, config);
+      }
+   }, 500);
+
+   OBSERVER_INTERVALS[key] = interval;
+}
+
+/**
+ * throttles a function, so it doesn't get called too often
+ * @param {Function} fn function to throttle
+ * @param {number} threshhold time in ms to wait before calling the function again
+ * @param {Object} scope scope of the function
+ */
+function throttle(fn, threshhold, scope) {
+   threshhold || (threshhold = 250);
+   var last,
+      deferTimer;
+   return function () {
+      var context = scope || this;
+
+      var now = +new Date,
+         args = arguments;
+      if (last && now < last + threshhold) {
+         // hold on to it
+         clearTimeout(deferTimer);
+         deferTimer = setTimeout(function () {
+            last = now;
+            fn.apply(context, args);
+         }, threshhold);
+      } else {
+         last = now;
+         fn.apply(context, args);
+      }
+   };
+}
+
+/**
+ * CHEATS object that gets looped to add the cheats to the settings
+ * @param name name of the cheat, displayed in the settings
+ * @param type type of the cheat, @see GENERATORS
+ * @param func function to run when the cheat is toggled
+ * @param description description of the cheat, displayed in the settings
+ */
 const CHEATS = {
    autoAccept: {
       name: 'Auto Accept',
       type: 'checkbox',
       func: (checked) => {
+         console.log("auto accept:");
+         window.localStorage.setItem('autoAccept', checked);
          // if(checked) {
          //    autoAcceptObserver = new MutationObserver((mutations) => {
          //       const acceptButton = document.querySelector('.ready-check-button-accept');
@@ -318,6 +462,7 @@ const CHEATS = {
       type: 'button',
       // description: 'Buy a champion, pick it during a game and click this button before the game ends, no refund token will be used to refund it',
       func: async () => {
+         console.log('refund last purchase:');
          const storeUrl = await fetch('/lol-store/v1/getStoreUrl').then((res) => {
             return res.json();
          });
@@ -363,6 +508,7 @@ const CHEATS = {
       description: 'You still lose LP',
       type: 'button',
       func: () => {
+         console.log('dodge match:');
          dodgeMatch();
       }
    },
@@ -371,6 +517,7 @@ const CHEATS = {
       description: 'Reveal lobby users',
       type: 'button',
       func: async () => {
+         console.log('multi search:');
          const champSelect = await fetch('/lol-champ-select/v1/session').then((res) => res.json());
          if (champSelect.errorCode) return;
          let team = [];
@@ -409,6 +556,68 @@ const CHEATS = {
          console.log(region, url);
       }
    },
+   hideRuneRecommender: {
+      name: 'Hide Rune Recommender',
+      type: 'checkbox',
+      description: 'Hide the rune recommender button and automatically click the manual runes button',
+      func: (checked) => {
+         console.log('hide rune recommender:');
+         window.localStorage.setItem('hideRuneRecommender', checked);
+         if (checked) {
+            injectCSS('hideRuneRecommender', `
+            /* button in rune-recommender page */
+            .runes-recommender-header > :first-child {
+               display: none;
+            }
+            /* button in manual-runes page */
+            .perks-body-header .clickable-icon-label-container {
+                  display: none !important;
+            }
+           `);
+
+
+            runeSelectorObserver = new MutationObserver((mutations) => {
+               const addedNodes = mutations.find((record) => Array.from(record.addedNodes));
+               if(addedNodes) {
+                  for(const node of addedNodes.addedNodes) {
+                     console.log(node);
+                     if(node.querySelector('.runes-application')) {
+                        console.log("YES :)");
+                        setTimeout(() => {
+                           return clickManualRunes();
+                        }, 300); // for some reason it doesn't work without a timeout
+                     }
+                  }
+               }
+               // const el = document.querySelector(`.runes-application`);
+               // if (el) {
+               //    const selectedPage = document.querySelector(".runes-application > :first-child");
+               //    const runesRecommenderSelected = selectedPage?.classList.contains('runes-recommender-root');
+               //    if(runesRecommenderSelected) {
+               //     //  return clickManualRunes();
+               //    }
+               //    // TODO: somehow make it chill. only need to click it once and wait for el to appear again.
+               // }
+            });
+
+            addObserver(runeSelectorObserver,
+               '#lol-uikit-layer-manager-wrapper',
+               {
+                  attributes: true,
+                  childList: true,
+                  subtree: true,
+                  characterData: true
+               },
+               'rune-selector-observer');
+
+         } else {
+            removeCSS('hideRuneRecommender');
+            clearInterval(OBSERVER_INTERVALS['rune-selector-observer']);
+            runeSelectorObserver?.disconnect();
+            runeSelectorObserver = null;
+         }
+      }
+   }
    // instaGift: {
    //    name: 'Insta Gift',
    //    description: 'Instagift item id to friend',
@@ -474,6 +683,9 @@ const CHEATS = {
    // }
 }
 
+/**
+ * generates html elements for settingss
+ */
 const GENERATORS = {
    checkbox: generateCheckbox,
    button: generateButton,
@@ -481,6 +693,9 @@ const GENERATORS = {
    html: generateHTML
 }
 
+/**
+ * observes when settings panel is opened and adds the cheat settings.
+ */
 const observer = new MutationObserver(async (mutations) => {
    const panel = document.querySelector(
       'div.lol-settings-options > lol-uikit-scrollable'
@@ -547,8 +762,8 @@ const observer = new MutationObserver(async (mutations) => {
       for (const key in CHEATS) {
          try {
             const cheat = CHEATS[key];
-            const generated = await GENERATORS[cheat.type](key, cheat);
-            console.log(cheat.type, key, generated);
+            const localStorage = window.localStorage.getItem(key);
+            const generated = await GENERATORS[cheat.type](key, cheat, localStorage);
             if (!cheat.description) {
                generated.style.marginBottom = "12px";
             }
@@ -567,6 +782,9 @@ const observer = new MutationObserver(async (mutations) => {
    }
 });
 
+/**
+ * idk, sarah
+ */
 function accessThemeCSS(value) {
    const root = document.documentElement;
    // remove formatting from the url
@@ -592,29 +810,61 @@ function accessThemeCSS(value) {
    //console.log(decodeURIComponent(value));
 }
 
+/**
+ * reloads the theme
+ */
 function themeReload() {
-   var style = document.createElement('link');
+   const style = document.createElement('link');
    style.textContent = require('./theme.css');
    style.type = 'text/css';
    style.rel = 'stylesheet';
    head.append(style);
 }
 
+/**
+ * injects a <style> element with provided css.
+ * 
+ * all added stylesheets will be stored in INJECTED_CSS, so they can be removed later based on key.
+ * @param {string} key key that will be used to remove the css
+ * @param {*} css css to inject
+ */
+function injectCSS(key, css) {
+   const style = document.createElement('style');
+   style.textContent = css;
+   style.type = 'text/css';
+   style.rel = 'stylesheet';
+   document.body.append(style);
+   INJECTED_CSS[key] = style;
+}
+
+/**
+ * finds and removes a <style> element based on key.
+ * 
+ * @param {keyof 'INJECTED_CSS'} key key of the css to remove. must be found in INJECTED_CSS
+ */
+function removeCSS(key) {
+   INJECTED_CSS[key].remove();
+   delete INJECTED_CSS[key];
+}
+/**
+ * on client load, adds a mutation observer for settings panel and injects the theme css.
+ */
 window.addEventListener('load', () => {
-   const interval = setInterval(() => {
-      const manager = document.getElementById(
-         'lol-uikit-layer-manager-wrapper'
-      );
-      if (manager) {
-         clearInterval(interval);
-         observer.observe(manager, {
-            attributes: true,
-            childList: true,
-            subtree: true,
-            characterData: true,
-         });
-      }
-   }, 500);
+   // const interval = setInterval(() => {
+   //    const target = document.querySelector(
+   //       '#lol-uikit-layer-manager-wrapper'
+   //    );
+   //    if (target) {
+   //       console.log("FOUND!!");
+   //       clearInterval(interval);
+   //       observer.observe(target, {
+   //          attributes: true,
+   //          childList: true,
+   //          subtree: true,
+   //          characterData: true,
+   //       });
+   //    }
+   // }, 500);
    let style = document.createElement('style');
    style.textContent = require('./theme.css');
    style.type = 'text/css';
@@ -622,4 +872,23 @@ window.addEventListener('load', () => {
    document.body.append(style);
    console.clear();
    console.log('We injected bois');
+   addObserver(observer,
+      '#lol-uikit-layer-manager-wrapper',
+      {
+         attributes: true,
+         childList: true,
+         subtree: true,
+         characterData: true
+      },
+      'settings-panel-observer');
+
+   // run enabled cheats after reload
+   for (const key in CHEATS) {
+      const cheat = CHEATS[key];
+      const localStorage = window.localStorage.getItem(key);
+      console.log(key, localStorage);
+      if (localStorage === 'true') {
+         cheat.func(localStorage);
+      }
+   }
 });
