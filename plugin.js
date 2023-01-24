@@ -26,6 +26,78 @@ const OBSERVER_INTERVALS = {};
  */
 let runeSelectorObserver = null;
 
+
+/**
+ * used to store settings api url. 
+ * 
+ * Settings are saved and loaded from this API.
+ */
+const SETTINGS_API_URL = null;
+
+/**
+ * used to store the summoner id, so we can send it to API
+ * 
+ * can be set to your wanted summ id to sync settings
+ */
+let SUMMONER_ID = null;
+
+async function getSummonerID() {
+   const { summonerId } = await getHeaders();
+   return summonerId;
+}
+
+/**
+ * Generate settings object from local storage
+ */
+const generateSettings = () => {
+   const settings = {};
+   for (const key in CHEATS) {
+      settings[key] = localStorage.getItem(key) === 'true';
+   }
+   return settings;
+}
+
+/**
+ * Send settings to API
+ * @param {object} data settings object
+ */
+const saveSettingsObject = async (data) => {
+   if(!SETTINGS_API_URL) return console.error('SETTINGS_API_URL not set');
+   const response = await fetch(`${SETTINGS_API_URL}/${SUMMONER_ID}`, {
+      method: 'POST',
+      headers: {
+         'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+   });
+   return response.json();
+}
+
+/**
+ * Get settings from localStorage and send them to API
+*/
+const generateAndSaveSettings = async () => {
+   const settings = generateSettings();
+   const response = await saveSettingsObject(settings);
+   return response;
+}
+
+/**
+ * get saved settings from API
+ * @returns settings object
+ */
+const getSettings = async () => {
+   if(!SETTINGS_API_URL) return console.error('SETTINGS_API_URL not set');
+   const response = await fetch(`${SETTINGS_API_URL}/${SUMMONER_ID}`, {
+      method: 'GET',
+      headers: {
+         'Content-Type': 'application/json',
+      },
+   });
+   return response.json();
+}
+
+
 /**
  * generates description (<label> element) for setting
  * @param {string} text 
@@ -39,6 +111,10 @@ const generateDescription = (text) => {
    return label;
 }
 
+const setSetting = async (key, value) => {
+   window.localStorage.setItem(key, value);
+   await generateAndSaveSettings();
+}
 
 /**
  * 
@@ -321,9 +397,7 @@ async function getHeaders() {
    const url = response.url;
    //extract port from url
    const port = url.split(':')[2].split('/')[0];
-   const accountId = session.accountId;
-   const idToken = session.idToken;
-   return { port, idToken };
+   return { port, ...session };
 }
 
 /**
@@ -419,7 +493,7 @@ const CHEATS = {
       type: 'checkbox',
       func: (checked) => {
          console.log("auto accept:");
-         window.localStorage.setItem('autoAccept', checked);
+         setSetting('autoAccept', checked);
          // if(checked) {
          //    autoAcceptObserver = new MutationObserver((mutations) => {
          //       const acceptButton = document.querySelector('.ready-check-button-accept');
@@ -578,10 +652,10 @@ const CHEATS = {
 
             runeSelectorObserver = new MutationObserver((mutations) => {
                const addedNodes = mutations.find((record) => Array.from(record.addedNodes));
-               if(addedNodes) {
-                  for(const node of addedNodes.addedNodes) {
+               if (addedNodes) {
+                  for (const node of addedNodes.addedNodes) {
                      console.log(node);
-                     if(node.querySelector('.runes-application')) {
+                     if (node.querySelector('.runes-application')) {
                         console.log("YES :)");
                         setTimeout(() => {
                            return clickManualRunes();
@@ -849,7 +923,7 @@ function removeCSS(key) {
 /**
  * on client load, adds a mutation observer for settings panel and injects the theme css.
  */
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
    // const interval = setInterval(() => {
    //    const target = document.querySelector(
    //       '#lol-uikit-layer-manager-wrapper'
@@ -882,8 +956,16 @@ window.addEventListener('load', () => {
       },
       'settings-panel-observer');
 
+   // set summoner id if it is null
+   SUMMONER_ID ??= await getSummonerID();
+
+   // get settings from API
+   const settings = await getSettings();
+
+   const obj = settings ? settings : CHEATS;
+
    // run enabled cheats after reload
-   for (const key in CHEATS) {
+   for (const key in obj) {
       const cheat = CHEATS[key];
       const localStorage = window.localStorage.getItem(key);
       console.log(key, localStorage);
