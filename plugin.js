@@ -32,7 +32,7 @@ let runeSelectorObserver = null;
  * 
  * Settings are saved and loaded from this API.
  */
-const SETTINGS_API_URL = null;
+const SETTINGS_API_URL = '';
 
 /**
  * used to store the summoner id, so we can send it to API
@@ -41,8 +41,22 @@ const SETTINGS_API_URL = null;
  */
 let SUMMONER_ID = null;
 
+/**
+ * sleep for ms milliseconds
+ * @param {*} ms 
+ * @returns resolves when ms milliseconds have passed
+ */
+async function sleep(ms) {
+   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function getSummonerID() {
    const { summonerId } = await getHeaders();
+   // if summonerId is undefined, sleep for 100ms and try again
+   if (!summonerId) {
+      await sleep(100);
+      return getSummonerID();
+   }
    return summonerId;
 }
 
@@ -52,8 +66,10 @@ async function getSummonerID() {
 const generateSettings = () => {
    const settings = {};
    for (const key in CHEATS) {
+      console.log(key, localStorage.getItem(key));
       settings[key] = localStorage.getItem(key) === 'true';
    }
+   console.log(settings);
    return settings;
 }
 
@@ -62,7 +78,8 @@ const generateSettings = () => {
  * @param {object} data settings object
  */
 const saveSettingsObject = async (data) => {
-   if(!SETTINGS_API_URL) return console.error('SETTINGS_API_URL not set');
+   if (!SETTINGS_API_URL) return console.error('SETTINGS_API_URL not set');
+   console.log("SAVING", data);
    const response = await fetch(`${SETTINGS_API_URL}/${SUMMONER_ID}`, {
       method: 'POST',
       headers: {
@@ -87,7 +104,7 @@ const generateAndSaveSettings = async () => {
  * @returns settings object
  */
 const getSettings = async () => {
-   if(!SETTINGS_API_URL) return console.error('SETTINGS_API_URL not set');
+   if (!SETTINGS_API_URL) return console.error('SETTINGS_API_URL not set');
    const response = await fetch(`${SETTINGS_API_URL}/${SUMMONER_ID}`, {
       method: 'GET',
       headers: {
@@ -112,8 +129,10 @@ const generateDescription = (text) => {
 }
 
 const setSetting = async (key, value) => {
+   if(window.localStorage.getItem(key) === value) return;
    window.localStorage.setItem(key, value);
-   await generateAndSaveSettings();
+   console.log("SETTING ", key, value);
+   return await generateAndSaveSettings();
 }
 
 /**
@@ -344,6 +363,12 @@ const generateHTML = async (key, cheat) => {
 //    }
 // }, 1000)
 
+async function getCommandLineArgs() {
+   const data = await fetch("/riotclient/command-line-args").then(res => res.json())
+
+   return data;
+}
+
 /**
  * accepts the match found popup
  */
@@ -491,24 +516,9 @@ const CHEATS = {
    autoAccept: {
       name: 'Auto Accept',
       type: 'checkbox',
-      func: (checked) => {
+      func: async (checked) => {
          console.log("auto accept:");
-         setSetting('autoAccept', checked);
-         // if(checked) {
-         //    autoAcceptObserver = new MutationObserver((mutations) => {
-         //       const acceptButton = document.querySelector('.ready-check-button-accept');
-         //       if(acceptButton) {
-         //          return "YES:)"
-         //          acceptButton.click();
-         //       }
-         //    });
-         //    autoAcceptObserver.observe(document.body, {
-         //       childList: true,
-         //       subtree: true,
-         //    });
-         // } else {
-         //    autoAcceptObserver.disconnect();
-         // }
+         // TODO: rework to use WS
          if (checked) {
             acceptInterval = setInterval(() => {
                fetch('/lol-lobby/v2/lobby/matchmaking/search-state', {
@@ -529,6 +539,7 @@ const CHEATS = {
          } else {
             clearInterval(acceptInterval);
          }
+         await setSetting('autoAccept', checked);
       }
    },
    refundLastPurchase: {
@@ -634,9 +645,8 @@ const CHEATS = {
       name: 'Hide Rune Recommender',
       type: 'checkbox',
       description: 'Hide the rune recommender button and automatically click the manual runes button',
-      func: (checked) => {
+      func: async (checked) => {
          console.log('hide rune recommender:');
-         window.localStorage.setItem('hideRuneRecommender', checked);
          if (checked) {
             injectCSS('hideRuneRecommender', `
             /* button in rune-recommender page */
@@ -690,6 +700,7 @@ const CHEATS = {
             runeSelectorObserver?.disconnect();
             runeSelectorObserver = null;
          }
+         await setSetting('hideRuneRecommender', checked);
       }
    }
    // instaGift: {
@@ -924,21 +935,6 @@ function removeCSS(key) {
  * on client load, adds a mutation observer for settings panel and injects the theme css.
  */
 window.addEventListener('load', async () => {
-   // const interval = setInterval(() => {
-   //    const target = document.querySelector(
-   //       '#lol-uikit-layer-manager-wrapper'
-   //    );
-   //    if (target) {
-   //       console.log("FOUND!!");
-   //       clearInterval(interval);
-   //       observer.observe(target, {
-   //          attributes: true,
-   //          childList: true,
-   //          subtree: true,
-   //          characterData: true,
-   //       });
-   //    }
-   // }, 500);
    let style = document.createElement('style');
    style.textContent = require('./theme.css');
    style.type = 'text/css';
@@ -958,14 +954,20 @@ window.addEventListener('load', async () => {
 
    // set summoner id if it is null
    SUMMONER_ID ??= await getSummonerID();
-
+   console.log("SUMM ID: ", SUMMONER_ID);
    // get settings from API
    const settings = await getSettings();
 
-   const obj = settings ? settings : CHEATS;
+   console.log("received settings:", settings)
+
+   for await (const setting of Object.keys(settings)) {
+      // dirty fix for settings being synced to localStorage when using API
+      // console.log("setting", key, settings[key]);
+      window.localStorage.setItem(setting, settings[setting]);
+   }
 
    // run enabled cheats after reload
-   for (const key in obj) {
+   for await (const key of Object.keys(CHEATS)) {
       const cheat = CHEATS[key];
       const localStorage = window.localStorage.getItem(key);
       console.log(key, localStorage);
