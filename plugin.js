@@ -5,6 +5,12 @@
 // let autoAcceptObserver;
 
 /**
+ * used to store the client state, so we can add/remove shit based on state
+ * matchmaking when in queue, readyCheck when queue pops, ChampSelect when in champ select
+ */
+let CLIENT_STATE = null;
+
+/**
  * used to store the interval for auto accept, so we can close it in case user disables setting
  */
 let acceptInterval;
@@ -129,7 +135,7 @@ const generateDescription = (text) => {
 }
 
 const setSetting = async (key, value) => {
-   if(window.localStorage.getItem(key) === value) return;
+   if (window.localStorage.getItem(key) === value) return;
    window.localStorage.setItem(key, value);
    console.log("SETTING ", key, value);
    return await generateAndSaveSettings();
@@ -373,7 +379,7 @@ async function getCommandLineArgs() {
  * accepts the match found popup
  */
 function acceptMatchFound() {
-   fetch('/lol-matchmaking/v1/ready-check/accept', {
+   return fetch('/lol-matchmaking/v1/ready-check/accept', {
       method: 'POST'
    })
 }
@@ -518,27 +524,6 @@ const CHEATS = {
       type: 'checkbox',
       func: async (checked) => {
          console.log("auto accept:");
-         // TODO: rework to use WS
-         if (checked) {
-            acceptInterval = setInterval(() => {
-               fetch('/lol-lobby/v2/lobby/matchmaking/search-state', {
-                  method: 'GET',
-               }).then((res) => {
-                  return res.json();
-               }
-               ).then((data) => {
-                  if (data.searchState === 'Found') {
-                     acceptMatchFound();
-                  }
-               }
-               ).catch((err) => {
-                  console.log(err);
-               }
-               );
-            }, 1000);
-         } else {
-            clearInterval(acceptInterval);
-         }
          await setSetting('autoAccept', checked);
       }
    },
@@ -958,14 +943,15 @@ window.addEventListener('load', async () => {
    // get settings from API
    const settings = await getSettings();
 
-   console.log("received settings:", settings)
+   if (settings != undefined) {
+      console.log("received settings:", settings)
 
-   for await (const setting of Object.keys(settings)) {
-      // dirty fix for settings being synced to localStorage when using API
-      // console.log("setting", key, settings[key]);
-      window.localStorage.setItem(setting, settings[setting]);
+      for await (const setting of Object.keys(settings)) {
+         // dirty fix for settings being synced to localStorage when using API
+         // console.log("setting", key, settings[key]);
+         window.localStorage.setItem(setting, settings[setting]);
+      }
    }
-
    // run enabled cheats after reload
    for await (const key of Object.keys(CHEATS)) {
       const cheat = CHEATS[key];
@@ -975,4 +961,25 @@ window.addEventListener('load', async () => {
          cheat.func(localStorage);
       }
    }
+
+   subscribe_endpoint("/lol-gameflow/v1/gameflow-phase", async (msg) => {
+      CLIENT_STATE = JSON.parse(msg.data)[2]["data"];
+      if (CLIENT_STATE == "ReadyCheck" && window.localStorage.getItem("autoAccept") == "true") {
+         await acceptMatchFound();
+      }
+   });
 });
+
+/**
+ * Subscribe to a specific endpoint, and trigger callback function when that endpoint is called
+ * @param {string} endpoint Endpoint you wish to monitor. ex: /lol-gameflow/v1/gameflow-phase , send "" to subscribe to all
+ * @param {function} callback The callback function
+ */
+
+async function subscribe_endpoint(endpoint, callback) {
+   const uri = document.querySelector('link[rel="riot:plugins:websocket"]').href
+   const ws = new WebSocket(uri, 'wamp')
+
+   ws.onopen = () => ws.send(JSON.stringify([5, 'OnJsonApiEvent' + endpoint.replace(/\//g, '_')]))
+   ws.onmessage = callback
+}
