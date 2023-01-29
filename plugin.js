@@ -10,10 +10,14 @@
  */
 let CLIENT_STATE = null;
 
+let champSelectInterval = null;
+
 /**
  * used to store the interval for auto accept, so we can close it in case user disables setting
  */
 let acceptInterval;
+
+let dodgeButtonAdded = false;
 
 /**
  * used to store the injected css elements, so we can remove them in case user disables setting
@@ -206,13 +210,14 @@ const generateButton = (key, cheat) => {
    return lol_uikit_flat_button;
 }
 
-const generateButtonHTML = (name) => {
-   const lol_uikit_flat_button = document.createElement('lol-uikit-flat-button-secondary');
+const generateButtonHTML = (name, onclick, secondary = true) => {
+   const lol_uikit_flat_button = document.createElement(`lol-uikit-flat-button${secondary ? '-secondary' : ''}`);
    lol_uikit_flat_button.style.display = 'flex';
-   lol_uikit_flat_button.style.marginBottom = '12px';
    lol_uikit_flat_button.textContent = name;
    lol_uikit_flat_button.setAttribute('size', 'small');
-
+   lol_uikit_flat_button.addEventListener('click', (e) => {
+      onclick();
+   });
    return lol_uikit_flat_button;
 }
 
@@ -375,6 +380,34 @@ async function getCommandLineArgs() {
    return data;
 }
 
+async function createLobby(id) {
+   return await fetch("/lol-lobby/v2/lobby", {
+      headers: {
+         "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ "queueId": id }),
+      method: "POST",
+   }).then(res => res.json());
+}
+
+async function playAgain() {
+   const voteSkipButton = document.querySelector('.prompted-voting-skip-button');
+   if (voteSkipButton) {
+      voteSkipButton.click();
+   }
+   await fetch("/lol-lobby/v2/play-again", {
+      method: "POST",
+   });
+}
+
+async function startQueue() {
+   console.log("starting queue");
+   // TODO: wait for find match button to become active
+   return await fetch("/lol-lobby/v2/lobby/matchmaking/search", {
+      method: "POST",
+   });
+}
+
 /**
  * accepts the match found popup
  */
@@ -388,6 +421,7 @@ function acceptMatchFound() {
  * dodges the match, you still lose LP
  */
 function dodgeMatch() {
+   console.log('called dodge');
    fetch('/lol-login/v1/session/invoke?destination=lcdsServiceProxy&method=call&args=["","teambuilder-draft","quitV2",""]', {
       method: 'POST'
    });
@@ -582,6 +616,24 @@ const CHEATS = {
          dodgeMatch();
       }
    },
+   createLobby: {
+      name: 'Create Lobby',
+      description: 'Create a lobby with the selected settings',
+      type: 'button',
+      func: async () => {
+         // TODO: add settings for this, gameIds select
+         await createLobby(900);
+      },
+   },
+   autoReQueue: {
+      name: 'Auto Re-Queue',
+      description: 'Automatically re-queue after a game',
+      type: 'checkbox',
+      func: async (checked) => {
+         console.log('auto re-queue:');
+         await setSetting('autoReQueue', checked);
+      }
+   },
    multiSearch: {
       name: 'Multi Search',
       description: 'Reveal lobby users',
@@ -688,69 +740,6 @@ const CHEATS = {
          await setSetting('hideRuneRecommender', checked);
       }
    }
-   // instaGift: {
-   //    name: 'Insta Gift',
-   //    description: 'Instagift item id to friend',
-   //    type: 'html',
-   //    html: async () => {
-   //       const div = document.createElement('div');
-   //       const p = document.createElement('p');
-   //       p.classList.add('lol-settings-window-size-text');
-   //       p.innerText = 'Instagift';
-   //       div.appendChild(p);
-   //       const friends = (await getFriends()).filter((friend) => friend.summonerId != 0);
-   //       const form = document.createElement('form');
-   //       form.appendChild(generateSelectHTML('friend', friends, 'summonerId', 'gameName'));
-   //       form.appendChild(generateInputHTML('itemId', 'text', null, 'Item Id'));
-   //       const btn = generateButtonHTML('Gift');
-
-   //       form.appendChild(btn);
-   //       btn.addEventListener('click', (e) => {
-   //          e.preventDefault();
-   //          const formData = new FormData(form);
-   //          const itemId = formData.get('itemId');
-   //          const friendId = formData.get('friend');
-   //          CHEATS.instaGift.func(itemId, friendId);
-   //       });
-   //       div.appendChild(form);
-   //       return div;
-   //    },
-   //    func: async (item, friend) => {
-   //       console.log(item, friend);
-   //       const storeUrl = await fetch('/lol-store/v1/getStoreUrl').then((res) => {
-   //          return res.json();
-   //       });
-   //       const session = await fetch('/lol-login/v1/session').then((res) => {
-   //          return res.json();
-   //       });
-   //       if (!session) return;
-   //       const idToken = session.idToken;
-   //       const accountId = session.accountId;
-   //       const gift = await fetch(`${storeUrl}/storefront/v3/gift`, {
-   //          method: 'POST',
-   //          headers: {
-   //             'Authorization': `Bearer ${idToken}`,
-   //             'Accept': 'application/json',
-   //             'Content-Type': 'application/json'
-   //          },
-   //          body: JSON.stringify({
-   //             receiverSummonerId: friend,
-   //             giftItemId: "69900831",
-   //             accountId: accountId,
-   //             items: [{
-   //                inventoryType: 'BUNDLES',
-   //                itemId: "69900831",
-   //                ipCost: null,
-   //                rpCost: 250,
-   //                quantity: 1
-   //             }]
-   //          })
-   //       }).then((res) => {
-   //          return res.json();
-   //       });
-   //       console.log(gift);
-   //    }
-   // }
 }
 
 /**
@@ -916,6 +905,30 @@ function removeCSS(key) {
    INJECTED_CSS[key].remove();
    delete INJECTED_CSS[key];
 }
+
+/**
+ * 
+ * @param {keyof CHEATS} key cheat name
+ * @returns {boolean} true if cheat is enabled, false if not
+ */
+function isCheatEnabled(key) {
+   return window.localStorage.getItem(key) === 'true';
+}
+
+function champSelectStateFunctionality() {
+   champSelectInterval = setInterval(() => {
+      const bottomRightButtons = document.querySelector(".bottom-right-buttons");
+      if (bottomRightButtons) {
+         if (dodgeButtonAdded) return clearInterval(champSelectInterval);
+         const btn = generateButtonHTML("Dodge", dodgeMatch, false);
+         btn.classList.add("ember-view", "quit-button");
+         bottomRightButtons.prepend(btn);
+         clearInterval(champSelectInterval);
+         dodgeButtonAdded = true;
+      }
+   }, 200);
+}
+
 /**
  * on client load, adds a mutation observer for settings panel and injects the theme css.
  */
@@ -964,8 +977,21 @@ window.addEventListener('load', async () => {
 
    subscribe_endpoint("/lol-gameflow/v1/gameflow-phase", async (msg) => {
       CLIENT_STATE = JSON.parse(msg.data)[2]["data"];
-      if (CLIENT_STATE == "ReadyCheck" && window.localStorage.getItem("autoAccept") == "true") {
-         await acceptMatchFound();
+      console.log("CLIENT STATE IS", CLIENT_STATE);
+      if (CLIENT_STATE != "ChampSelect") {
+         clearInterval(champSelectInterval);
+      }
+      if (CLIENT_STATE == "ReadyCheck") {
+         if (isCheatEnabled("autoAccept")) {
+            await acceptMatchFound();
+         }
+      } else if (CLIENT_STATE == "ChampSelect") {
+         champSelectStateFunctionality();
+      } else if (CLIENT_STATE == "EndOfGame") {
+         if (isCheatEnabled("autoReQueue")) {
+            await playAgain();
+            await startQueue();
+         }
       }
    });
 });
