@@ -987,6 +987,14 @@ window.addEventListener('load', async () => {
          }
       } else if (CLIENT_STATE == "ChampSelect") {
          champSelectStateFunctionality();
+      } else if (CLIENT_STATE == "PreEndOfGame") {
+         if (isCheatEnabled("autoReQeueue")) {
+            // auto click OK on chest and level up notifications
+            const celebration = document.querySelector(".vignette-celebration");
+            if (celebration) {
+               celebration.querySelector('lol-uikit-flat-button').shadowRoot.querySelector(".lol-uikit-flat-button-wrapper").click();
+            }
+         }
       } else if (CLIENT_STATE == "EndOfGame") {
          if (isCheatEnabled("autoReQueue")) {
             await playAgain();
