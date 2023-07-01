@@ -36,236 +36,250 @@ const OBSERVER_INTERVALS = {};
  */
 let runeSelectorObserver = null;
 
-
 /**
- * used to store settings api url. 
- * 
+ * used to store settings api url.
+ *
  * Settings are saved and loaded from this API.
  */
-const SETTINGS_API_URL = '';
+const SETTINGS_API_URL = "";
 
 /**
  * used to store the summoner id, so we can send it to API
- * 
+ *
  * can be set to your wanted summ id to sync settings
  */
 let SUMMONER_ID = null;
 
 /**
  * sleep for ms milliseconds
- * @param {*} ms 
+ * @param {*} ms
  * @returns resolves when ms milliseconds have passed
  */
 async function sleep(ms) {
-   return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function getSummonerID() {
-   const { summonerId } = await getHeaders();
-   // if summonerId is undefined, sleep for 100ms and try again
-   if (!summonerId) {
-      await sleep(100);
-      return getSummonerID();
-   }
-   return summonerId;
+  const { summonerId } = await getHeaders();
+  // if summonerId is undefined, sleep for 100ms and try again
+  if (!summonerId) {
+    await sleep(100);
+    return getSummonerID();
+  }
+  return summonerId;
 }
 
 /**
  * Generate settings object from local storage
  */
 const generateSettings = () => {
-   const settings = {};
-   for (const key in CHEATS) {
-      console.log(key, localStorage.getItem(key));
-      settings[key] = localStorage.getItem(key) === 'true';
-   }
-   console.log(settings);
-   return settings;
-}
+  const settings = {};
+  for (const key in CHEATS) {
+    console.log(key, localStorage.getItem(key));
+    settings[key] = localStorage.getItem(key) === "true";
+  }
+  console.log(settings);
+  return settings;
+};
 
 /**
  * Send settings to API
  * @param {object} data settings object
  */
 const saveSettingsObject = async (data) => {
-   if (!SETTINGS_API_URL) return console.error('SETTINGS_API_URL not set');
-   console.log("SAVING", data);
-   const response = await fetch(`${SETTINGS_API_URL}/${SUMMONER_ID}`, {
-      method: 'POST',
-      headers: {
-         'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-   });
-   return response.json();
-}
+  if (!SETTINGS_API_URL) return console.error("SETTINGS_API_URL not set");
+  console.log("SAVING", data);
+  const response = await fetch(`${SETTINGS_API_URL}/${SUMMONER_ID}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+  return response.json();
+};
 
 /**
  * Get settings from localStorage and send them to API
-*/
+ */
 const generateAndSaveSettings = async () => {
-   const settings = generateSettings();
-   const response = await saveSettingsObject(settings);
-   return response;
-}
+  const settings = generateSettings();
+  const response = await saveSettingsObject(settings);
+  return response;
+};
 
 /**
  * get saved settings from API
  * @returns settings object
  */
 const getSettings = async () => {
-   if (!SETTINGS_API_URL) return console.error('SETTINGS_API_URL not set');
-   const response = await fetch(`${SETTINGS_API_URL}/${SUMMONER_ID}`, {
-      method: 'GET',
-      headers: {
-         'Content-Type': 'application/json',
-      },
-   });
-   return response.json();
-}
-
+  if (!SETTINGS_API_URL) return console.error("SETTINGS_API_URL not set");
+  const response = await fetch(`${SETTINGS_API_URL}/${SUMMONER_ID}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+  return response.json();
+};
 
 /**
  * generates description (<label> element) for setting
- * @param {string} text 
+ * @param {string} text
  * @returns {LabelElement} <label> element
  */
 const generateDescription = (text) => {
-   const label = document.createElement('label');
-   label.classList.add('lol-settings-ingame-sound-description-text');
-   // label.classList.add('description-text');
-   label.textContent = text;
-   return label;
-}
+  const label = document.createElement("label");
+  label.classList.add("lol-settings-ingame-sound-description-text");
+  // label.classList.add('description-text');
+  label.textContent = text;
+  return label;
+};
 
 const setSetting = async (key, value) => {
-   if (window.localStorage.getItem(key) === value) return;
-   window.localStorage.setItem(key, value);
-   console.log("SETTING ", key, value);
-   return await generateAndSaveSettings();
-}
+  if (window.localStorage.getItem(key) === value) return;
+  window.localStorage.setItem(key, value);
+  console.log("SETTING ", key, value);
+  return await generateAndSaveSettings();
+};
 
 /**
- * 
+ *
  * @param {keyof CHEATS} key a key used to set input name and id, usually keyof CHEATS
  * @param {CHEATS[keyof CHEATS]} cheat object with cheat function, usually an entry in CHEATS
  * @returns {CheckboxElement} <lol-uikit-flat-checkbox> element
  */
 const generateCheckbox = (key, cheat, checked) => {
-   const lol_uikit_flat_checkbox = document.createElement('lol-uikit-flat-checkbox');
-   lol_uikit_flat_checkbox.setAttribute('for', key);
-   const input2 = document.createElement('input');
-   input2.slot = 'input';
-   input2.checked = checked;
-   input2.name = key;
-   input2.type = 'checkbox';
-   input2.id = key;
-   input2.classList.add('ember-checkbox');
-   input2.classList.add('ember-view');
-   const label = document.createElement('label');
-   label.slot = 'label';
-   label.textContent = cheat.name;
-   lol_uikit_flat_checkbox.append(input2);
-   lol_uikit_flat_checkbox.append(label);
-   input2.addEventListener('change', (e) => {
-      cheat.func(e.target.checked);
-   });
-   return lol_uikit_flat_checkbox;
-}
+  const lol_uikit_flat_checkbox = document.createElement(
+    "lol-uikit-flat-checkbox"
+  );
+  lol_uikit_flat_checkbox.setAttribute("for", key);
+  const input2 = document.createElement("input");
+  input2.slot = "input";
+  input2.checked = checked;
+  input2.name = key;
+  input2.type = "checkbox";
+  input2.id = key;
+  input2.classList.add("ember-checkbox");
+  input2.classList.add("ember-view");
+  const label = document.createElement("label");
+  label.slot = "label";
+  label.textContent = cheat.name;
+  lol_uikit_flat_checkbox.append(input2);
+  lol_uikit_flat_checkbox.append(label);
+  input2.addEventListener("change", (e) => {
+    cheat.func(e.target.checked);
+  });
+  return lol_uikit_flat_checkbox;
+};
 
 /**
- * 
- * @param {string} name name of input 
- * @param {string} type input type (text | number , etc) 
+ *
+ * @param {string} name name of input
+ * @param {string} type input type (text | number , etc)
  * @param {string} value input value
  * @param {string} placeholder placeholder text
  * @returns {InputElement} <lol-uikit-flat-input> element
  */
 const generateInputHTML = (name, type, value, placeholder) => {
-   const input = document.createElement('lol-uikit-flat-input');
-   input.style.marginBottom = '12px';
-   const searchbox = document.createElement('input');
-   searchbox.type = type;
-   searchbox.style.width = '200px';
-   searchbox.name = name;
-   searchbox.value = value;
-   searchbox.placeholder = placeholder;
-   searchbox.classList.add('ember-text-field');
-   searchbox.classList.add('ember-view');
-   input.append(searchbox);
-   return input;
-}
+  const input = document.createElement("lol-uikit-flat-input");
+  input.style.marginBottom = "12px";
+  const searchbox = document.createElement("input");
+  searchbox.type = type;
+  searchbox.style.width = "200px";
+  searchbox.name = name;
+  searchbox.value = value;
+  searchbox.placeholder = placeholder;
+  searchbox.classList.add("ember-text-field");
+  searchbox.classList.add("ember-view");
+  input.append(searchbox);
+  return input;
+};
 
 const generateButton = (key, cheat) => {
-   const lol_uikit_flat_button = document.createElement('lol-uikit-flat-button-secondary');
-   lol_uikit_flat_button.style.display = 'flex';
-   lol_uikit_flat_button.textContent = cheat.name;
-   lol_uikit_flat_button.setAttribute('for', key);
-   lol_uikit_flat_button.setAttribute('size', 'small');
+  const lol_uikit_flat_button = document.createElement(
+    "lol-uikit-flat-button-secondary"
+  );
+  lol_uikit_flat_button.style.display = "flex";
+  lol_uikit_flat_button.textContent = cheat.name;
+  lol_uikit_flat_button.setAttribute("for", key);
+  lol_uikit_flat_button.setAttribute("size", "small");
 
-   lol_uikit_flat_button.addEventListener('click', (e) => {
-      cheat.func();
-   });
+  lol_uikit_flat_button.addEventListener("click", (e) => {
+    cheat.func();
+  });
 
-   return lol_uikit_flat_button;
-}
+  return lol_uikit_flat_button;
+};
 
 const generateButtonHTML = (name, onclick, secondary = true) => {
-   const lol_uikit_flat_button = document.createElement(`lol-uikit-flat-button${secondary ? '-secondary' : ''}`);
-   lol_uikit_flat_button.style.display = 'flex';
-   lol_uikit_flat_button.textContent = name;
-   lol_uikit_flat_button.setAttribute('size', 'small');
-   lol_uikit_flat_button.addEventListener('click', (e) => {
-      onclick();
-   });
-   return lol_uikit_flat_button;
-}
+  const lol_uikit_flat_button = document.createElement(
+    `lol-uikit-flat-button${secondary ? "-secondary" : ""}`
+  );
+  lol_uikit_flat_button.style.display = "flex";
+  lol_uikit_flat_button.textContent = name;
+  lol_uikit_flat_button.setAttribute("size", "small");
+  lol_uikit_flat_button.addEventListener("click", (e) => {
+    onclick();
+  });
+  return lol_uikit_flat_button;
+};
 
-const generateSelect = (key, cheat) => {
-   const lol_uikit_flat_select = document.createElement('lol-uikit-flat-select');
-   lol_uikit_flat_select.setAttribute('for', key);
-   const select = document.createElement('select');
-   select.slot = 'select';
-   select.name = key;
-   select.id = key;
-   select.classList.add('ember-select');
-   select.classList.add('ember-view');
+const generateSelect = async (key, cheat) => {
+  const lol_uikit_flat_select = document.createElement("lol-uikit-flat-select");
+  lol_uikit_flat_select.setAttribute("for", key);
+  const select = document.createElement("select");
+  select.slot = "select";
+  select.name = key;
+  select.id = key;
+  select.classList.add("ember-select");
+  select.classList.add("ember-view");
 
-   for (const key in cheat.options) {
-      const option = document.createElement('option');
-      option.value = key;
-      option.textContent = cheat.options[key];
-      select.append(option);
-   }
-   lol_uikit_flat_select.append(select);
+  if (typeof cheat.options === "function") {
+    cheat.options = await cheat.options();
+  }
 
-   return lol_uikit_flat_select;
-}
+  for (const key in cheat.options) {
+    const option = document.createElement("option");
+    option.value = key;
+    option.textContent = cheat.options[key];
+    select.append(option);
+  }
+  lol_uikit_flat_select.append(select);
+
+  const button = generateButtonHTML(cheat.name, () => {
+    cheat.func(select.value);
+  });
+  button.style.marginBottom = "12px";
+  lol_uikit_flat_select.append(button);
+
+  return lol_uikit_flat_select;
+};
 
 const generateSelectHTML = (name, options, valueKey, displayKey) => {
-   const lol_uikit_flat_select = document.createElement('lol-uikit-flat-select');
-   lol_uikit_flat_select.style.marginBottom = '12px';
-   lol_uikit_flat_select.setAttribute('size', 'small');
-   const select = document.createElement('select');
-   select.slot = 'select';
-   select.name = name;
-   select.classList.add('ember-select');
-   select.classList.add('ember-view');
-   select.style.marginBottom = '12px';
-   for (const option of options) {
-      const option2 = document.createElement('option');
-      option2.value = valueKey ? option[valueKey] : option;
-      option2.textContent = displayKey ? option[displayKey] : option;
-      select.append(option2);
-   }
-   lol_uikit_flat_select.append(select);
-   return lol_uikit_flat_select;
-}
+  const lol_uikit_flat_select = document.createElement("lol-uikit-flat-select");
+  lol_uikit_flat_select.style.marginBottom = "12px";
+  lol_uikit_flat_select.setAttribute("size", "small");
+  const select = document.createElement("select");
+  select.slot = "select";
+  select.name = name;
+  select.classList.add("ember-select");
+  select.classList.add("ember-view");
+  select.style.marginBottom = "12px";
+  for (const option of options) {
+    const option2 = document.createElement("option");
+    option2.value = valueKey ? option[valueKey] : option;
+    option2.textContent = displayKey ? option[displayKey] : option;
+    select.append(option2);
+  }
+  lol_uikit_flat_select.append(select);
+  return lol_uikit_flat_select;
+};
 
 const generateHTML = async (key, cheat) => {
-   return await cheat.html();
-}
-// not in use atm - adds settings to friend list as a "group" 
+  return await cheat.html();
+};
+// not in use atm - adds settings to friend list as a "group"
 // const generateSettingsHTML = (cheatList) => {
 //    const lol_social_roster_group = document.createElement('div');
 //    lol_social_roster_group.classList.add('lol-social-roster-group');
@@ -313,7 +327,6 @@ const generateHTML = async (key, cheat) => {
 //    const slide_ul = document.createElement('ul');
 //    slide_ul.classList.add('slide');
 
-
 //    for (const key in cheatList) {
 //       const cheat = cheatList[key];
 //       const lol_settings_general_row = document.createElement('div');
@@ -338,7 +351,6 @@ const generateHTML = async (key, cheat) => {
 //       slide_ul.append(lol_settings_general_row);
 //    }
 //    group_name.append(slide_ul);
-
 
 //    lol_social_roster_group.addEventListener('click', (e) => {
 //       console.log('clicked', e.target);
@@ -375,56 +387,61 @@ const generateHTML = async (key, cheat) => {
 // }, 1000)
 
 async function getCommandLineArgs() {
-   const data = await fetch("/riotclient/command-line-args").then(res => res.json())
+  const data = await fetch("/riotclient/command-line-args").then((res) =>
+    res.json()
+  );
 
-   return data;
+  return data;
 }
 
 async function createLobby(id) {
-   return await fetch("/lol-lobby/v2/lobby", {
-      headers: {
-         "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ "queueId": id }),
-      method: "POST",
-   }).then(res => res.json());
+  return await fetch("/lol-lobby/v2/lobby", {
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ queueId: id }),
+    method: "POST",
+  }).then((res) => res.json());
 }
 
 async function playAgain() {
-   const voteSkipButton = document.querySelector('.prompted-voting-skip-button');
-   if (voteSkipButton) {
-      voteSkipButton.click();
-   }
-   await fetch("/lol-lobby/v2/play-again", {
-      method: "POST",
-   });
+  const voteSkipButton = document.querySelector(".prompted-voting-skip-button");
+  if (voteSkipButton) {
+    voteSkipButton.click();
+  }
+  await fetch("/lol-lobby/v2/play-again", {
+    method: "POST",
+  });
 }
 
 async function startQueue() {
-   console.log("starting queue");
-   // TODO: wait for find match button to become active
-   return await fetch("/lol-lobby/v2/lobby/matchmaking/search", {
-      method: "POST",
-   });
+  console.log("starting queue");
+  // TODO: wait for find match button to become active
+  return await fetch("/lol-lobby/v2/lobby/matchmaking/search", {
+    method: "POST",
+  });
 }
 
 /**
  * accepts the match found popup
  */
 function acceptMatchFound() {
-   return fetch('/lol-matchmaking/v1/ready-check/accept', {
-      method: 'POST'
-   })
+  return fetch("/lol-matchmaking/v1/ready-check/accept", {
+    method: "POST",
+  });
 }
 
 /**
  * dodges the match, you still lose LP
  */
 function dodgeMatch() {
-   console.log('called dodge');
-   fetch('/lol-login/v1/session/invoke?destination=lcdsServiceProxy&method=call&args=["","teambuilder-draft","quitV2",""]', {
-      method: 'POST'
-   });
+  console.log("called dodge");
+  fetch(
+    '/lol-login/v1/session/invoke?destination=lcdsServiceProxy&method=call&args=["","teambuilder-draft","quitV2",""]',
+    {
+      method: "POST",
+    }
+  );
 }
 
 /**
@@ -432,14 +449,16 @@ function dodgeMatch() {
  * @param {Object} player player object, uses summonerId and nameVisibilityType
  */
 async function getPlayer(player) {
-   if (player.nameVisibilityType === 'Hidden') {
-      const response = await fetch('/chat/v5/participants/champ-select');
-      const data = await response.json();
-   } else {
-      const response = await fetch(`/lol-summoner/v1/summoners/${player.summonerId}`);
-      const data = await response.json();
-      return data;
-   }
+  if (player.nameVisibilityType === "Hidden") {
+    const response = await fetch("/chat/v5/participants/champ-select");
+    const data = await response.json();
+  } else {
+    const response = await fetch(
+      `/lol-summoner/v1/summoners/${player.summonerId}`
+    );
+    const data = await response.json();
+    return data;
+  }
 }
 
 /**
@@ -447,9 +466,9 @@ async function getPlayer(player) {
  * @returns {Object[]} array of friends' summoner data
  */
 async function getFriends() {
-   const data = await fetch("/lol-chat/v1/friends");
-   const friends = await data.json();
-   return friends;
+  const data = await fetch("/lol-chat/v1/friends");
+  const friends = await data.json();
+  return friends;
 }
 
 /**
@@ -457,12 +476,12 @@ async function getFriends() {
  * @returns {Object} port and idToken
  */
 async function getHeaders() {
-   const response = await fetch('/lol-login/v1/session');
-   const session = await response.json();
-   const url = response.url;
-   //extract port from url
-   const port = url.split(':')[2].split('/')[0];
-   return { port, ...session };
+  const response = await fetch("/lol-login/v1/session");
+  const session = await response.json();
+  const url = response.url;
+  //extract port from url
+  const port = url.split(":")[2].split("/")[0];
+  return { port, ...session };
 }
 
 /**
@@ -470,16 +489,18 @@ async function getHeaders() {
  * @returns {Object} object with access token
  */
 async function getToken() {
-   const response = await fetch("/lol-rso-auth/v1/authorization/access-token");
-   const data = await response.json();
-   return data;
+  const response = await fetch("/lol-rso-auth/v1/authorization/access-token");
+  const data = await response.json();
+  return data;
 }
 
 /**
  * clicks the 'edit runes' button in rune selector modal
  */
 async function clickManualRunes() {
-   document.querySelector(".runes-recommender-header > div:nth-child(2) > div").click();
+  document
+    .querySelector(".runes-recommender-header > div:nth-child(2) > div")
+    .click();
 }
 
 /**
@@ -492,28 +513,26 @@ async function clickManualRunes() {
  * @returns {Promise} promise that resolves when the observer is added
  */
 function addObserver(observer, targetSelector, config, key) {
-   console.log('adding observer', targetSelector, key)
-   // const interval = setInterval(() => {
-   //    const target = document.querySelector(targetSelector);
-   //    console.log(`[${key}] target:`, target, `selector: ${targetSelector}`)
-   //    if (target) {
-   //       console.log(`[${key}] FOUND!`, target)
-   //       clearInterval(interval);
-   //       observer.observe(target, config);
-   //    }
-   // }, 500);
-   const interval = setInterval(() => {
-      const target = document.querySelector(
-         targetSelector
-      );
-      if (target) {
-         console.log("FOUND!!");
-         clearInterval(interval);
-         observer.observe(target, config);
-      }
-   }, 500);
+  console.log("adding observer", targetSelector, key);
+  // const interval = setInterval(() => {
+  //    const target = document.querySelector(targetSelector);
+  //    console.log(`[${key}] target:`, target, `selector: ${targetSelector}`)
+  //    if (target) {
+  //       console.log(`[${key}] FOUND!`, target)
+  //       clearInterval(interval);
+  //       observer.observe(target, config);
+  //    }
+  // }, 500);
+  const interval = setInterval(() => {
+    const target = document.querySelector(targetSelector);
+    if (target) {
+      console.log("FOUND!!");
+      clearInterval(interval);
+      observer.observe(target, config);
+    }
+  }, 500);
 
-   OBSERVER_INTERVALS[key] = interval;
+  OBSERVER_INTERVALS[key] = interval;
 }
 
 /**
@@ -523,27 +542,67 @@ function addObserver(observer, targetSelector, config, key) {
  * @param {Object} scope scope of the function
  */
 function throttle(fn, threshhold, scope) {
-   threshhold || (threshhold = 250);
-   var last,
-      deferTimer;
-   return function () {
-      var context = scope || this;
+  threshhold || (threshhold = 250);
+  var last, deferTimer;
+  return function () {
+    var context = scope || this;
 
-      var now = +new Date,
-         args = arguments;
-      if (last && now < last + threshhold) {
-         // hold on to it
-         clearTimeout(deferTimer);
-         deferTimer = setTimeout(function () {
-            last = now;
-            fn.apply(context, args);
-         }, threshhold);
-      } else {
-         last = now;
-         fn.apply(context, args);
-      }
-   };
+    var now = +new Date(),
+      args = arguments;
+    if (last && now < last + threshhold) {
+      // hold on to it
+      clearTimeout(deferTimer);
+      deferTimer = setTimeout(function () {
+        last = now;
+        fn.apply(context, args);
+      }, threshhold);
+    } else {
+      last = now;
+      fn.apply(context, args);
+    }
+  };
 }
+
+const fetchPurchaseHistory = async () => {
+  console.log("fetching transactions");
+  const storeUrl = await fetch("/lol-store/v1/getStoreUrl").then((res) => {
+    return res.json();
+  });
+  const { token } = await getToken();
+  const purchaseHistory = await fetch(
+    `${storeUrl}/storefront/v3/history/purchase`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+    }
+  ).then((res) => {
+    return res.json();
+  });
+  return purchaseHistory;
+};
+
+const refundTransaction = async (transaction, accountId) => {
+  const refund = await fetch(`${storeUrl}/storefront/v3/refund`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      accountId,
+      transactionId: transaction.transactionId,
+      inventoryType: transaction.inventoryType,
+      language: "EN_US",
+    }),
+  }).then((res) => {
+    return res.json();
+  });
+  return refund;
+};
 
 /**
  * CHEATS object that gets looped to add the cheats to the settings
@@ -553,139 +612,144 @@ function throttle(fn, threshhold, scope) {
  * @param description description of the cheat, displayed in the settings
  */
 const CHEATS = {
-   autoAccept: {
-      name: 'Auto Accept',
-      type: 'checkbox',
-      func: async (checked) => {
-         console.log("auto accept:");
-         await setSetting('autoAccept', checked);
+  autoAccept: {
+    name: "Auto Accept",
+    type: "checkbox",
+    func: async (checked) => {
+      console.log("auto accept:");
+      await setSetting("autoAccept", checked);
+    },
+  },
+  refundLastPurchase: {
+    name: "Refund Last Purchase",
+    type: "button",
+    // description: 'Buy a champion, pick it during a game and click this button before the game ends, no refund token will be used to refund it',
+    func: async () => {
+      const session = await fetch("/lol-login/v1/session").then((res) => {
+        return res.json();
+      });
+      if (!session) return;
+      const accountId = session.accountId;
+      const transactions = await fetchPurchaseHistory();
+      if (!transactions || transactions.length <= 0) return;
+      const lastPurchase = transactions[0];
+      const refund = await refundTransaction(lastPurchase, accountId);
+      console.log(refund);
+    },
+  },
+  multiRefund: {
+    name: "Refund",
+    type: "select",
+    options: async () => {
+      const {transactions, catalog} = await fetchPurchaseHistory() ?? {};
+      const options = {};
+      console.log({transactions})
+      if(!transactions) return options;
+      const filteredTransactions = transactions.filter(t => t.refundable)
+      for (const transaction of filteredTransactions) {
+        const itemName = catalog.find(c => c.itemId === transaction.itemId).name;
+        const label = `${itemName} (${transaction.amountSpent} ${transaction.currencyType})`;
+        console.log('generated label:', label)
+        options[label] = transaction;
       }
-   },
-   refundLastPurchase: {
-      name: 'Refund Last Purchase',
-      type: 'button',
-      // description: 'Buy a champion, pick it during a game and click this button before the game ends, no refund token will be used to refund it',
-      func: async () => {
-         console.log('refund last purchase:');
-         const storeUrl = await fetch('/lol-store/v1/getStoreUrl').then((res) => {
-            return res.json();
-         });
-         const session = await fetch('/lol-login/v1/session').then((res) => {
-            return res.json();
-         });
-         if (!session) return;
-         const { token } = await getToken();
-         const accountId = session.accountId;
-         const purchaseHistory = await fetch(`${storeUrl}/storefront/v3/history/purchase`, {
-            headers: {
-               'Authorization': `Bearer ${token}`,
-               'Accept': 'application/json',
-               'Content-Type': 'application/json'
-            }
-         }).then((res) => {
-            return res.json();
-         });
-         if (!purchaseHistory || purchaseHistory.transactions.length <= 0) return;
-         const lastPurchase = purchaseHistory.transactions[0];
-         console.log(purchaseHistory);
-         const refund = await fetch(`${storeUrl}/storefront/v3/refund`, {
-            method: 'POST',
-            headers: {
-               'Authorization': `Bearer ${token}`,
-               'Accept': 'application/json',
-               'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-               accountId,
-               transactionId: lastPurchase.transactionId,
-               inventoryType: lastPurchase.inventoryType,
-               language: 'EN_US'
-            })
-         }).then((res) => {
-            return res.json();
-         });
-         console.log(refund);
+      console.log({options})
+      return options;
+    },
+    func: async (value) => {
+      const session = await fetch("/lol-login/v1/session").then((res) => {
+        return res.json();
+      });
+      const accountId = session.accountId;
+      console.log("multi refund:");
+      await refundTransaction(value, accountId);
+    },
+  },
+  dodgeMatch: {
+    name: "Dodge Match",
+    description: "You still lose LP",
+    type: "button",
+    func: () => {
+      console.log("dodge match:");
+      dodgeMatch();
+    },
+  },
+  createLobby: {
+    name: "Create Lobby",
+    description: "Create a lobby with the selected settings",
+    type: "button",
+    func: async () => {
+      // TODO: add settings for this, gameIds select
+      await createLobby(900);
+    },
+  },
+  autoReQueue: {
+    name: "Auto Re-Queue",
+    description: "Automatically re-queue after a game",
+    type: "checkbox",
+    func: async (checked) => {
+      console.log("auto re-queue:");
+      await setSetting("autoReQueue", checked);
+    },
+  },
+  multiSearch: {
+    name: "Multi Search",
+    description: "Reveal lobby users",
+    type: "button",
+    func: async () => {
+      console.log("multi search:");
+      const champSelect = await fetch("/lol-champ-select/v1/session").then(
+        (res) => res.json()
+      );
+      if (champSelect.errorCode) return;
+      let team = [];
+      if (!champSelect.myTeam) return;
+      let reqHeaders;
+      let isRanked = false;
+      if (champSelect.myTeam[0].nameVisibilityType.toLowerCase() == "hidden") {
+        isRanked = true;
+        reqHeaders = await getHeaders();
       }
-   },
-   dodgeMatch: {
-      name: 'Dodge Match',
-      description: 'You still lose LP',
-      type: 'button',
-      func: () => {
-         console.log('dodge match:');
-         dodgeMatch();
-      }
-   },
-   createLobby: {
-      name: 'Create Lobby',
-      description: 'Create a lobby with the selected settings',
-      type: 'button',
-      func: async () => {
-         // TODO: add settings for this, gameIds select
-         await createLobby(900);
-      },
-   },
-   autoReQueue: {
-      name: 'Auto Re-Queue',
-      description: 'Automatically re-queue after a game',
-      type: 'checkbox',
-      func: async (checked) => {
-         console.log('auto re-queue:');
-         await setSetting('autoReQueue', checked);
-      }
-   },
-   multiSearch: {
-      name: 'Multi Search',
-      description: 'Reveal lobby users',
-      type: 'button',
-      func: async () => {
-         console.log('multi search:');
-         const champSelect = await fetch('/lol-champ-select/v1/session').then((res) => res.json());
-         if (champSelect.errorCode) return;
-         let team = [];
-         if (!champSelect.myTeam) return;
-         let reqHeaders;
-         let isRanked = false;
-         if (champSelect.myTeam[0].nameVisibilityType.toLowerCase() == 'hidden') {
-            isRanked = true;
-            reqHeaders = await getHeaders();
-         }
 
-         console.log("ranked", isRanked);
+      console.log("ranked", isRanked);
 
-         if (isRanked) {
-            const response = await fetch('/chat/v5/participants/champ-select', {
-               method: 'GET',
-               headers: {
-                  'Accept': 'application/json',
-                  'Content-Type': 'application/json',
-               }
-            });
-            const data = await response.json();
-            team = data.participants;
-         } else {
-            for (const player of champSelect.myTeam) {
-               team.push(await getPlayer(player))
-            }
-         }
-
-         console.log(team);
-         const region = await fetch('/riotclient/get_region_locale').then((res) => res.json());
-         const regionCode = region.webRegion;
-         const summonerNames = team.map((player) => player.displayName);
-         const summonerNamesString = summonerNames.join(',');
-         const url = `https://${regionCode}.op.gg/multi/query=${summonerNamesString}`;
-         console.log(region, url);
+      if (isRanked) {
+        const response = await fetch("/chat/v5/participants/champ-select", {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+        });
+        const data = await response.json();
+        team = data.participants;
+      } else {
+        for (const player of champSelect.myTeam) {
+          team.push(await getPlayer(player));
+        }
       }
-   },
-   hideRuneRecommender: {
-      name: 'Hide Rune Recommender',
-      type: 'checkbox',
-      description: 'Hide the rune recommender button and automatically click the manual runes button',
-      func: async (checked) => {
-         console.log('hide rune recommender:');
-         if (checked) {
-            injectCSS('hideRuneRecommender', `
+
+      console.log(team);
+      const region = await fetch("/riotclient/get_region_locale").then((res) =>
+        res.json()
+      );
+      const regionCode = region.webRegion;
+      const summonerNames = team.map((player) => player.displayName);
+      const summonerNamesString = summonerNames.join(",");
+      const url = `https://${regionCode}.op.gg/multi/query=${summonerNamesString}`;
+      console.log(region, url);
+    },
+  },
+  hideRuneRecommender: {
+    name: "Hide Rune Recommender",
+    type: "checkbox",
+    description:
+      "Hide the rune recommender button and automatically click the manual runes button",
+    func: async (checked) => {
+      console.log("hide rune recommender:");
+      if (checked) {
+        injectCSS(
+          "hideRuneRecommender",
+          `
             /* button in rune-recommender page */
             .runes-recommender-header > :first-child {
                display: none;
@@ -694,314 +758,323 @@ const CHEATS = {
             .perks-body-header .clickable-icon-label-container {
                   display: none !important;
             }
-           `);
+           `
+        );
 
+        runeSelectorObserver = new MutationObserver((mutations) => {
+          const addedNodes = mutations.find((record) =>
+            Array.from(record.addedNodes)
+          );
+          if (addedNodes) {
+            for (const node of addedNodes.addedNodes) {
+              console.log(node);
+              if (node.querySelector(".runes-application")) {
+                console.log("YES :)");
+                setTimeout(() => {
+                  return clickManualRunes();
+                }, 300); // for some reason it doesn't work without a timeout
+              }
+            }
+          }
+          // const el = document.querySelector(`.runes-application`);
+          // if (el) {
+          //    const selectedPage = document.querySelector(".runes-application > :first-child");
+          //    const runesRecommenderSelected = selectedPage?.classList.contains('runes-recommender-root');
+          //    if(runesRecommenderSelected) {
+          //     //  return clickManualRunes();
+          //    }
+          //    // TODO: somehow make it chill. only need to click it once and wait for el to appear again.
+          // }
+        });
 
-            runeSelectorObserver = new MutationObserver((mutations) => {
-               const addedNodes = mutations.find((record) => Array.from(record.addedNodes));
-               if (addedNodes) {
-                  for (const node of addedNodes.addedNodes) {
-                     console.log(node);
-                     if (node.querySelector('.runes-application')) {
-                        console.log("YES :)");
-                        setTimeout(() => {
-                           return clickManualRunes();
-                        }, 300); // for some reason it doesn't work without a timeout
-                     }
-                  }
-               }
-               // const el = document.querySelector(`.runes-application`);
-               // if (el) {
-               //    const selectedPage = document.querySelector(".runes-application > :first-child");
-               //    const runesRecommenderSelected = selectedPage?.classList.contains('runes-recommender-root');
-               //    if(runesRecommenderSelected) {
-               //     //  return clickManualRunes();
-               //    }
-               //    // TODO: somehow make it chill. only need to click it once and wait for el to appear again.
-               // }
-            });
-
-            addObserver(runeSelectorObserver,
-               '#lol-uikit-layer-manager-wrapper',
-               {
-                  attributes: true,
-                  childList: true,
-                  subtree: true,
-                  characterData: true
-               },
-               'rune-selector-observer');
-
-         } else {
-            removeCSS('hideRuneRecommender');
-            clearInterval(OBSERVER_INTERVALS['rune-selector-observer']);
-            runeSelectorObserver?.disconnect();
-            runeSelectorObserver = null;
-         }
-         await setSetting('hideRuneRecommender', checked);
+        addObserver(
+          runeSelectorObserver,
+          "#lol-uikit-layer-manager-wrapper",
+          {
+            attributes: true,
+            childList: true,
+            subtree: true,
+            characterData: true,
+          },
+          "rune-selector-observer"
+        );
+      } else {
+        removeCSS("hideRuneRecommender");
+        clearInterval(OBSERVER_INTERVALS["rune-selector-observer"]);
+        runeSelectorObserver?.disconnect();
+        runeSelectorObserver = null;
       }
-   }
-}
+      await setSetting("hideRuneRecommender", checked);
+    },
+  },
+};
 
 /**
  * generates html elements for settingss
  */
 const GENERATORS = {
-   checkbox: generateCheckbox,
-   button: generateButton,
-   select: generateSelect,
-   html: generateHTML
-}
+  checkbox: generateCheckbox,
+  button: generateButton,
+  select: generateSelect,
+  html: generateHTML,
+};
 
 /**
  * observes when settings panel is opened and adds the cheat settings.
  */
 const observer = new MutationObserver(async (mutations) => {
-   const panel = document.querySelector(
-      'div.lol-settings-options > lol-uikit-scrollable'
-   );
-   if (
-      panel &&
-      mutations.find((record) => Array.from(record.addedNodes).includes(panel))
-   ) {
-      const row = document.createElement('div');
-      row.classList.add('lol-settings-general-row');
+  const panel = document.querySelector(
+    "div.lol-settings-options > lol-uikit-scrollable"
+  );
+  if (
+    panel &&
+    mutations.find((record) => Array.from(record.addedNodes).includes(panel))
+  ) {
+    const row = document.createElement("div");
+    row.classList.add("lol-settings-general-row");
 
-      const label = document.createElement('p');
-      label.classList.add('lol-settings-window-size-text');
-      label.textContent = 'Reload Theme';
-      label.style.marginBottom = '12px';
+    const label = document.createElement("p");
+    label.classList.add("lol-settings-window-size-text");
+    label.textContent = "Reload Theme";
+    label.style.marginBottom = "12px";
 
-      const searchdiv = document.createElement('searchbox-container');
-      searchdiv.style.marginBottom = '12px';
-      searchdiv.style.display = 'inline-block';
+    const searchdiv = document.createElement("searchbox-container");
+    searchdiv.style.marginBottom = "12px";
+    searchdiv.style.display = "inline-block";
 
-      // create a text field
-      const input = document.createElement('lol-uikit-flat-input');
-      input.style.marginBottom = '12px';
-      const searchbox = document.createElement('input');
-      searchbox.type = 'url';
-      searchbox.placeholder = 'Theme URL';
-      searchbox.style.width = '200px';
-      searchbox.name = 'name';
+    // create a text field
+    const input = document.createElement("lol-uikit-flat-input");
+    input.style.marginBottom = "12px";
+    const searchbox = document.createElement("input");
+    searchbox.type = "url";
+    searchbox.placeholder = "Theme URL";
+    searchbox.style.width = "200px";
+    searchbox.name = "name";
 
-      const btn = document.createElement('lol-uikit-flat-button-secondary');
-      btn.style.display = 'flex';
-      btn.textContent = 'Reload theme';
-      btn.style.marginBottom = '12px';
-      btn.onclick = () => {
-         location.reload();
-         themeReload();
-      };
+    const btn = document.createElement("lol-uikit-flat-button-secondary");
+    btn.style.display = "flex";
+    btn.textContent = "Reload theme";
+    btn.style.marginBottom = "12px";
+    btn.onclick = () => {
+      location.reload();
+      themeReload();
+    };
 
-      // if input of searchbox changes wait for 1 second
-      // and check if the value is a valid url
-      // if it is valid change the root values
-      searchbox.oninput = () => {
-         setTimeout(() => {
-            if (
-               searchbox.value.match(
-                  /(http(s?):)([/|.|\w|\s|-])*\.(?:jpg|gif|jpeg|png)/g
-               )
-            ) {
-               accessThemeCSS(searchbox.value);
-               // console.log('valid url');
-            } else {
-               //console.log('invalid url');
-            }
-         }, 1000);
-      };
+    // if input of searchbox changes wait for 1 second
+    // and check if the value is a valid url
+    // if it is valid change the root values
+    searchbox.oninput = () => {
+      setTimeout(() => {
+        if (
+          searchbox.value.match(
+            /(http(s?):)([/|.|\w|\s|-])*\.(?:jpg|gif|jpeg|png)/g
+          )
+        ) {
+          accessThemeCSS(searchbox.value);
+          // console.log('valid url');
+        } else {
+          //console.log('invalid url');
+        }
+      }, 1000);
+    };
 
-      searchdiv.append(input);
-      input.append(searchbox);
+    searchdiv.append(input);
+    input.append(searchbox);
 
-      row.append(label);
-      row.append(btn);
-      row.append(input);
+    row.append(label);
+    row.append(btn);
+    row.append(input);
 
-      for (const key in CHEATS) {
-         try {
-            const cheat = CHEATS[key];
-            const localStorage = window.localStorage.getItem(key);
-            const generated = await GENERATORS[cheat.type](key, cheat, localStorage);
-            if (!cheat.description) {
-               generated.style.marginBottom = "12px";
-            }
-            row.append(generated);
-            if (cheat.description) {
-               const description = generateDescription(cheat.description);
-               description.style.marginBottom = "12px";
-               row.append(description);
-            }
-         } catch (e) {
-            console.error(e);
-         }
+    for (const key in CHEATS) {
+      try {
+        const cheat = CHEATS[key];
+        const localStorage = window.localStorage.getItem(key);
+        const generated = await GENERATORS[cheat.type](
+          key,
+          cheat,
+          localStorage
+        );
+        if (!cheat.description) {
+          generated.style.marginBottom = "12px";
+        }
+        row.append(generated);
+        if (cheat.description) {
+          const description = generateDescription(cheat.description);
+          description.style.marginBottom = "12px";
+          row.append(description);
+        }
+      } catch (e) {
+        console.error(e);
       }
+    }
 
-      panel.prepend(row);
-   }
+    panel.prepend(row);
+  }
 });
 
 /**
  * idk, sarah
  */
 function accessThemeCSS(value) {
-   const root = document.documentElement;
-   // remove formatting from the url
-   // set the root values
-   // decode url to get the original url
-   root.style.setProperty('--background', `url(${decodeURIComponent(value)})`);
+  const root = document.documentElement;
+  // remove formatting from the url
+  // set the root values
+  // decode url to get the original url
+  root.style.setProperty("--background", `url(${decodeURIComponent(value)})`);
 
-   // ** This part doesnt work. Blame riot. i Have yet to find a way to save stuff in the client **
+  // ** This part doesnt work. Blame riot. i Have yet to find a way to save stuff in the client **
 
-   // check if the cookie already exists
-   // if it does see if the value is the same as the new value
-   // if it is not the same change the cookie value
-   // if it does not exist create a new cookie
-   if (document.cookie.indexOf('background') >= 0) {
-      if (document.cookie.indexOf(value) < 0) {
-         document.cookie = `background=${value}; expires=Thu, 18 Dec 2022 12:00:00 UTC; path=/`;
-      }
-   } else {
+  // check if the cookie already exists
+  // if it does see if the value is the same as the new value
+  // if it is not the same change the cookie value
+  // if it does not exist create a new cookie
+  if (document.cookie.indexOf("background") >= 0) {
+    if (document.cookie.indexOf(value) < 0) {
       document.cookie = `background=${value}; expires=Thu, 18 Dec 2022 12:00:00 UTC; path=/`;
-   }
+    }
+  } else {
+    document.cookie = `background=${value}; expires=Thu, 18 Dec 2022 12:00:00 UTC; path=/`;
+  }
 
-   //console.log('changed background');
-   //console.log(decodeURIComponent(value));
+  //console.log('changed background');
+  //console.log(decodeURIComponent(value));
 }
 
 /**
  * reloads the theme
  */
 function themeReload() {
-   const style = document.createElement('link');
-   style.textContent = require('./theme.css');
-   style.type = 'text/css';
-   style.rel = 'stylesheet';
-   head.append(style);
+  const style = document.createElement("link");
+  style.type = "text/css";
+  style.rel = "stylesheet";
+  head.append(style);
 }
 
 /**
  * injects a <style> element with provided css.
- * 
+ *
  * all added stylesheets will be stored in INJECTED_CSS, so they can be removed later based on key.
  * @param {string} key key that will be used to remove the css
  * @param {*} css css to inject
  */
 function injectCSS(key, css) {
-   const style = document.createElement('style');
-   style.textContent = css;
-   style.type = 'text/css';
-   style.rel = 'stylesheet';
-   document.body.append(style);
-   INJECTED_CSS[key] = style;
+  const style = document.createElement("style");
+  style.textContent = css;
+  style.type = "text/css";
+  style.rel = "stylesheet";
+  document.body.append(style);
+  INJECTED_CSS[key] = style;
 }
 
 /**
  * finds and removes a <style> element based on key.
- * 
+ *
  * @param {keyof 'INJECTED_CSS'} key key of the css to remove. must be found in INJECTED_CSS
  */
 function removeCSS(key) {
-   INJECTED_CSS[key].remove();
-   delete INJECTED_CSS[key];
+  INJECTED_CSS[key].remove();
+  delete INJECTED_CSS[key];
 }
 
 /**
- * 
+ *
  * @param {keyof CHEATS} key cheat name
  * @returns {boolean} true if cheat is enabled, false if not
  */
 function isCheatEnabled(key) {
-   return window.localStorage.getItem(key) === 'true';
+  return window.localStorage.getItem(key) === "true";
 }
 
 function champSelectStateFunctionality() {
-   champSelectInterval = setInterval(() => {
-      const bottomRightButtons = document.querySelector(".bottom-right-buttons");
-      if (bottomRightButtons) {
-         if (dodgeButtonAdded) return clearInterval(champSelectInterval);
-         const btn = generateButtonHTML("Dodge", dodgeMatch, false);
-         btn.classList.add("ember-view", "quit-button");
-         bottomRightButtons.prepend(btn);
-         clearInterval(champSelectInterval);
-         dodgeButtonAdded = true;
-      }
-   }, 200);
+  champSelectInterval = setInterval(() => {
+    const bottomRightButtons = document.querySelector(".bottom-right-buttons");
+    if (bottomRightButtons) {
+      if (dodgeButtonAdded) return clearInterval(champSelectInterval);
+      const btn = generateButtonHTML("Dodge", dodgeMatch, false);
+      btn.classList.add("ember-view", "quit-button");
+      bottomRightButtons.prepend(btn);
+      clearInterval(champSelectInterval);
+      dodgeButtonAdded = true;
+    }
+  }, 200);
 }
+
+window.addEventListener("load", async () => {
+  const session = await fetch("/lol-login/v1/session").then((res) => {
+    return res.json();
+  });
+  if (!session) return;
+  const accountId = session.accountId;
+  const transactions = await fetchPurchaseHistory();
+  const refund = await refundTransaction(transactions[0], accountId);
+});
 
 /**
  * on client load, adds a mutation observer for settings panel and injects the theme css.
  */
-window.addEventListener('load', async () => {
-   let style = document.createElement('style');
-   style.textContent = require('./theme.css');
-   style.type = 'text/css';
-   style.rel = 'stylesheet';
-   document.body.append(style);
-   console.clear();
-   console.log('We injected bois');
-   addObserver(observer,
-      '#lol-uikit-layer-manager-wrapper',
-      {
-         attributes: true,
-         childList: true,
-         subtree: true,
-         characterData: true
-      },
-      'settings-panel-observer');
+window.addEventListener("load", async () => {
+  let style = document.createElement("style");
+  style.type = "text/css";
+  style.rel = "stylesheet";
+  document.body.append(style);
+  console.clear();
+  console.log("We injected bois");
+  addObserver(
+    observer,
+    "#lol-uikit-layer-manager-wrapper",
+    {
+      attributes: true,
+      childList: true,
+      subtree: true,
+      characterData: true,
+    },
+    "settings-panel-observer"
+  );
 
-   // set summoner id if it is null
-   SUMMONER_ID ??= await getSummonerID();
-   console.log("SUMM ID: ", SUMMONER_ID);
-   // get settings from API
-   const settings = await getSettings();
+  // set summoner id if it is null
+  SUMMONER_ID ??= await getSummonerID();
+  console.log("SUMM ID: ", SUMMONER_ID);
 
-   if (settings != undefined) {
-      console.log("received settings:", settings)
+  // run enabled cheats after reload
+  for await (const key of Object.keys(CHEATS)) {
+    const cheat = CHEATS[key];
+    const localStorage = window.localStorage.getItem(key);
+    console.log(key, localStorage);
+    if (localStorage === "true") {
+      cheat.func(localStorage);
+    }
+  }
 
-      for await (const setting of Object.keys(settings)) {
-         // dirty fix for settings being synced to localStorage when using API
-         // console.log("setting", key, settings[key]);
-         window.localStorage.setItem(setting, settings[setting]);
+  subscribe_endpoint("/lol-gameflow/v1/gameflow-phase", async (msg) => {
+    CLIENT_STATE = JSON.parse(msg.data)[2]["data"];
+    console.log("CLIENT STATE IS", CLIENT_STATE);
+    if (CLIENT_STATE != "ChampSelect") {
+      clearInterval(champSelectInterval);
+    }
+    if (CLIENT_STATE == "ReadyCheck") {
+      if (isCheatEnabled("autoAccept")) {
+        await acceptMatchFound();
       }
-   }
-   // run enabled cheats after reload
-   for await (const key of Object.keys(CHEATS)) {
-      const cheat = CHEATS[key];
-      const localStorage = window.localStorage.getItem(key);
-      console.log(key, localStorage);
-      if (localStorage === 'true') {
-         cheat.func(localStorage);
+    } else if (CLIENT_STATE == "ChampSelect") {
+      champSelectStateFunctionality();
+    } else if (CLIENT_STATE == "PreEndOfGame") {
+      if (isCheatEnabled("autoReQeueue")) {
+        // auto click OK on chest and level up notifications
+        const celebration = document.querySelector(".vignette-celebration");
+        if (celebration) {
+          celebration
+            .querySelector("lol-uikit-flat-button")
+            .shadowRoot.querySelector(".lol-uikit-flat-button-wrapper")
+            .click();
+        }
       }
-   }
-
-   subscribe_endpoint("/lol-gameflow/v1/gameflow-phase", async (msg) => {
-      CLIENT_STATE = JSON.parse(msg.data)[2]["data"];
-      console.log("CLIENT STATE IS", CLIENT_STATE);
-      if (CLIENT_STATE != "ChampSelect") {
-         clearInterval(champSelectInterval);
+    } else if (CLIENT_STATE == "EndOfGame") {
+      if (isCheatEnabled("autoReQueue")) {
+        await playAgain();
+        await startQueue();
       }
-      if (CLIENT_STATE == "ReadyCheck") {
-         if (isCheatEnabled("autoAccept")) {
-            await acceptMatchFound();
-         }
-      } else if (CLIENT_STATE == "ChampSelect") {
-         champSelectStateFunctionality();
-      } else if (CLIENT_STATE == "PreEndOfGame") {
-         if (isCheatEnabled("autoReQeueue")) {
-            // auto click OK on chest and level up notifications
-            const celebration = document.querySelector(".vignette-celebration");
-            if (celebration) {
-               celebration.querySelector('lol-uikit-flat-button').shadowRoot.querySelector(".lol-uikit-flat-button-wrapper").click();
-            }
-         }
-      } else if (CLIENT_STATE == "EndOfGame") {
-         if (isCheatEnabled("autoReQueue")) {
-            await playAgain();
-            await startQueue();
-         }
-      }
-   });
+    }
+  });
 });
 
 /**
@@ -1011,9 +1084,12 @@ window.addEventListener('load', async () => {
  */
 
 async function subscribe_endpoint(endpoint, callback) {
-   const uri = document.querySelector('link[rel="riot:plugins:websocket"]').href
-   const ws = new WebSocket(uri, 'wamp')
+  const uri = document.querySelector('link[rel="riot:plugins:websocket"]').href;
+  const ws = new WebSocket(uri, "wamp");
 
-   ws.onopen = () => ws.send(JSON.stringify([5, 'OnJsonApiEvent' + endpoint.replace(/\//g, '_')]))
-   ws.onmessage = callback
+  ws.onopen = () =>
+    ws.send(
+      JSON.stringify([5, "OnJsonApiEvent" + endpoint.replace(/\//g, "_")])
+    );
+  ws.onmessage = callback;
 }
