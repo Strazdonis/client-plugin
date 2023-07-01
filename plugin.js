@@ -5,6 +5,20 @@
 // let autoAcceptObserver;
 
 /**
+ * used to store fetch promises, so we don't send multiple requests to the same url and avoid ratelimits
+ */
+const FETCH_CACHE = new Map();
+
+const fetchCache = (url, options) => {
+  if (FETCH_CACHE.has(url)) {
+    return FETCH_CACHE.get(url);
+  }
+  const promise = window.fetch(url, options);
+  FETCH_CACHE.set(url, promise);
+  return promise;
+};
+
+/**
  * used to store the client state, so we can add/remove shit based on state
  * matchmaking when in queue, readyCheck when queue pops, ChampSelect when in champ select
  */
@@ -225,6 +239,14 @@ const generateButtonHTML = (name, onclick, secondary = true) => {
   return lol_uikit_flat_button;
 };
 
+const tryParse = (value) => {
+  try {
+    return JSON.parse(value);
+  } catch (e) {
+    return value;
+  }
+};
+
 const generateSelect = async (key, cheat) => {
   const lol_uikit_flat_select = document.createElement("lol-uikit-flat-select");
   lol_uikit_flat_select.setAttribute("for", key);
@@ -241,14 +263,14 @@ const generateSelect = async (key, cheat) => {
 
   for (const key in cheat.options) {
     const option = document.createElement("option");
-    option.value = key;
-    option.textContent = cheat.options[key];
+    option.value = cheat.options[key];
+    option.textContent = key;
     select.append(option);
   }
   lol_uikit_flat_select.append(select);
 
   const button = generateButtonHTML(cheat.name, () => {
-    cheat.func(select.value);
+    cheat.func(tryParse(select.value));
   });
   button.style.marginBottom = "12px";
   lol_uikit_flat_select.append(button);
@@ -489,8 +511,8 @@ async function getHeaders() {
  * @returns {Object} object with access token
  */
 async function getToken() {
-  const response = await fetch("/lol-rso-auth/v1/authorization/access-token");
-  const data = await response.json();
+  const response = await fetchCache("/lol-rso-auth/v1/authorization/access-token");
+  const data = await response.clone().json();
   return data;
 }
 
@@ -563,10 +585,12 @@ function throttle(fn, threshhold, scope) {
   };
 }
 
+
+
 const fetchPurchaseHistory = async () => {
   console.log("fetching transactions");
-  const storeUrl = await fetch("/lol-store/v1/getStoreUrl").then((res) => {
-    return res.json();
+  const storeUrl = await fetchCache("/lol-store/v1/getStoreUrl").then((res) => {
+    return res.clone().json();
   });
   const { token } = await getToken();
   const purchaseHistory = await fetch(
@@ -585,6 +609,10 @@ const fetchPurchaseHistory = async () => {
 };
 
 const refundTransaction = async (transaction, accountId) => {
+  const storeUrl = await fetchCache("/lol-store/v1/getStoreUrl").then((res) => {
+    return res.clone().json();
+  });
+  const { token } = await getToken();
   const refund = await fetch(`${storeUrl}/storefront/v3/refund`, {
     method: "POST",
     headers: {
@@ -596,7 +624,7 @@ const refundTransaction = async (transaction, accountId) => {
       accountId,
       transactionId: transaction.transactionId,
       inventoryType: transaction.inventoryType,
-      language: "EN_US",
+      language: "en_US",
     }),
   }).then((res) => {
     return res.json();
@@ -641,18 +669,20 @@ const CHEATS = {
     name: "Refund",
     type: "select",
     options: async () => {
-      const {transactions, catalog} = await fetchPurchaseHistory() ?? {};
+      const { transactions, catalog } = (await fetchPurchaseHistory()) ?? {};
       const options = {};
-      console.log({transactions})
-      if(!transactions) return options;
-      const filteredTransactions = transactions.filter(t => t.refundable)
+      console.log({ transactions });
+      if (!transactions) return options;
+      const filteredTransactions = transactions.filter((t) => t.refundable);
       for (const transaction of filteredTransactions) {
-        const itemName = catalog.find(c => c.itemId === transaction.itemId).name;
+        const itemName = catalog.find(
+          (c) => c.itemId === transaction.itemId
+        ).name;
         const label = `${itemName} (${transaction.amountSpent} ${transaction.currencyType})`;
-        console.log('generated label:', label)
-        options[label] = transaction;
+        console.log("generated label:", label);
+        options[label] = JSON.stringify(transaction);
       }
-      console.log({options})
+      console.log({ options });
       return options;
     },
     func: async (value) => {
