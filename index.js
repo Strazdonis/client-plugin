@@ -257,16 +257,28 @@ const generateSelect = async (key, cheat) => {
   select.classList.add("ember-select");
   select.classList.add("ember-view");
 
+  const generateOptions = (options) => {
+    for (const key in options) {
+      const option = document.createElement("option");
+      option.value = options[key];
+      option.textContent = key;
+      select.append(option);
+    }
+  };
+
   if (typeof cheat.options === "function") {
     cheat.options = await cheat.options();
+    const refreshButton = generateButtonHTML("Refresh options", async () => {
+      cheat.options = await cheat.options();
+      select.innerHTML = "";
+      generateOptions(cheat.options);
+    });
+    refreshButton.style.marginBottom = "12px";
+    
+    lol_uikit_flat_select.append(refreshButton);
   }
 
-  for (const key in cheat.options) {
-    const option = document.createElement("option");
-    option.value = cheat.options[key];
-    option.textContent = key;
-    select.append(option);
-  }
+  generateOptions(cheat.options);
   lol_uikit_flat_select.append(select);
 
   const button = generateButtonHTML(cheat.name, () => {
