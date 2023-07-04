@@ -673,7 +673,7 @@ const CHEATS = {
       const options = {};
       console.log({ transactions });
       if (!transactions) return options;
-      const filteredTransactions = transactions.filter((t) => t.refundable);
+      const filteredTransactions = transactions.filter((t) => (t.refundable && t.refundabilityMessage !== "TOO_SOON_TO_REFUND"));
       for (const transaction of filteredTransactions) {
         const itemName = catalog.find(
           (c) => c.itemId === transaction.itemId
